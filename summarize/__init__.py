@@ -7,6 +7,7 @@ from linecache import getlines
 from configparser import ConfigParser
 
 from PyQt5 import QtGui, QtCore
+from PyQt5.QtCore import QThread, pyqtSignal # punt on QProcess due to IPC complexity
 from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel, QGridLayout, QProgressBar
 
 import xlsxwriter as xlwr
@@ -212,7 +213,11 @@ def dunion(d1, d2):
     return d
 
 
-def summarize_files(filenames, output_path, config):
+def do_nothing(*args):
+    pass
+
+
+def summarize_files(filenames, output_path, config, progress=None):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new summary.xls file from them
@@ -222,21 +227,32 @@ def summarize_files(filenames, output_path, config):
     readers, filenames = get_readers(filenames) # the initial filenames contains xlsx that are not produced by the post processor
     N = len(readers)
 
+    if progress is None:
+        progress = do_nothing
+
+    progress_count = [0]
+
+    def update_progress():
+        progress(progress_count[0])
+        progress_count[0] += 1
+
     if N == 0:
         print("no files found")
         return
 
     output_filename = allocate_unused_file_in_directory(os.path.join(output_path, OUTPUT_FILENAME))
 
+    update_progress()
+
     user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
     half_cycle_directions = config.half_cycle_directions
     half_cycle_fields = config.half_cycle_fields
 
     print("reading parameters")
-    all_parameters = [get_parameters(reader) for reader in readers]
+    all_parameters = [(get_parameters(reader), update_progress())[0] for reader in readers]
 
     print("reading summaries")
-    all_summaries = [get_summary_data(reader) for reader in readers]
+    all_summaries = [(get_summary_data(reader), update_progress())[0] for reader in readers]
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
     summary_titles = half_cycle_fields
@@ -285,6 +301,7 @@ def summarize_files(filenames, output_path, config):
     param_left_col = 1 + N_user + N_par # 1 - for file name; TODO: make this declarative (place cells on board with name, than use name)
 
     for filename, parameters, summary in zip(filenames, all_parameters, all_summaries):
+        update_progress()
         params_values = Render.subset(subset=parameter_names, d=parameters)
         sum_per_dir = [
             {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])
@@ -305,7 +322,9 @@ def summarize_files(filenames, output_path, config):
         row.inc(1)
     #summary_out.set_row(firstrow=0, lastrow=2, width=8)
     #summary_out.set_row(firstrow=2, lastrow=N + 3, width=8)
+    update_progress()
     output.write()
+    update_progress()
     return output_filename
 
 
@@ -381,6 +400,25 @@ class Config:
             return [x.strip() for x in [y for y in self.config.get(section, field, raw=True).split(',') if len(y) > 0]]
         return default
 
+
+class SummarizeThread(QThread):
+    sig = pyqtSignal(int)
+
+    def __init__(self, files, output, parent):
+        super().__init__(parent)
+        self.files = files
+        self.output = output
+
+    def progress(self, val):
+        self.sig.emit(val)
+
+    def run(self):
+        config = Config(self.output)
+        output_file = summarize_files(list(self.files), self.output, config=config, progress=self.progress)
+        self.output_file = output_file
+        self.progress(-1) # TODO - type safe, nicer
+
+
 class GUI(QWidget):
     def __init__(self):
         super().__init__()
@@ -388,12 +426,21 @@ class GUI(QWidget):
         self.files = set()
         self.output = None
 
+    def updateProgBar(self, *args, **kw):
+        print(f"TODO: Progress: {args}, {kw}")
+        if args[0] == -1:
+            self.onSummarizeDone(self.summarize_thread.output_file)
+
     def summarize(self):
-        config = Config(self.output)
-        output_file = summarize_files(list(self.files), self.output, config=config)
+        summarize_thread = SummarizeThread(files=self.files, output=self.output, parent=self)
+        # Connect signal to the desired function
+        summarize_thread.sig.connect(self.updateProgBar)
+        summarize_thread.start()
+        self.summarize_thread = summarize_thread
+
+    def onSummarizeDone(self, output_file):
         start(output_file)
         raise SystemExit
-
 
     def initUI(self):
         self.setAcceptDrops(True)
