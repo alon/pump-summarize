@@ -42,11 +42,18 @@ def read_xlsx(d):
     return filenames
 
 
-def get_readers(filenames):
-    readers = [xlrd.open_workbook(filename=filename) for filename in filenames]
-    data = [(reader, filename) for reader, filename in zip(readers, filenames) if
-               HALF_CYCLES_SHEET_NAME in reader.sheet_names()]
-    readers, filenames = [x[0] for x in data], [x[1] for x in data]
+def get_readers(orig_filenames, progress=None):
+    readers = []
+    filenames = []
+    for i, filename in enumerate(orig_filenames):
+        reader = xlrd.open_workbook(filename=filename)
+        sheet_names = reader.sheet_names()
+        if progress:
+            progress(i)
+        if HALF_CYCLES_SHEET_NAME not in sheet_names:
+            continue
+        readers.append(reader)
+        filenames.append(filename)
     return readers, filenames
 
 
@@ -224,8 +231,6 @@ def summarize_files(filenames, output_path, config, progress=None):
     :param dir:
     :return: written xlsx filename full path
     """
-    readers, filenames = get_readers(filenames) # the initial filenames contains xlsx that are not produced by the post processor
-    N = len(readers)
 
     if progress is None:
         progress = do_nothing
@@ -236,23 +241,24 @@ def summarize_files(filenames, output_path, config, progress=None):
         progress(progress_count[0])
         progress_count[0] += 1
 
+    readers, filenames = get_readers(filenames, lambda *args: update_progress()) # the initial filenames contains xlsx that are not produced by the post processor
+
+    N = len(readers)
     if N == 0:
         print("no files found")
         return
 
     output_filename = allocate_unused_file_in_directory(os.path.join(output_path, OUTPUT_FILENAME))
 
-    update_progress()
-
     user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
     half_cycle_directions = config.half_cycle_directions
     half_cycle_fields = config.half_cycle_fields
 
     print("reading parameters")
-    all_parameters = [(get_parameters(reader), update_progress())[0] for reader in readers]
+    all_parameters = [get_parameters(reader) for reader in readers]
 
     print("reading summaries")
-    all_summaries = [(get_summary_data(reader), update_progress())[0] for reader in readers]
+    all_summaries = [get_summary_data(reader) for reader in readers]
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
     summary_titles = half_cycle_fields
@@ -301,7 +307,6 @@ def summarize_files(filenames, output_path, config, progress=None):
     param_left_col = 1 + N_user + N_par # 1 - for file name; TODO: make this declarative (place cells on board with name, than use name)
 
     for filename, parameters, summary in zip(filenames, all_parameters, all_summaries):
-        update_progress()
         params_values = Render.subset(subset=parameter_names, d=parameters)
         sum_per_dir = [
             {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])
@@ -322,9 +327,7 @@ def summarize_files(filenames, output_path, config, progress=None):
         row.inc(1)
     #summary_out.set_row(firstrow=0, lastrow=2, width=8)
     #summary_out.set_row(firstrow=2, lastrow=N + 3, width=8)
-    update_progress()
     output.write()
-    update_progress()
     return output_filename
 
 
@@ -427,9 +430,12 @@ class GUI(QWidget):
         self.output = None
 
     def updateProgBar(self, *args, **kw):
-        print(f"TODO: Progress: {args}, {kw}")
         if args[0] == -1:
             self.onSummarizeDone(self.summarize_thread.output_file)
+        self.progress.show()
+        self.progress.setMaximum(len(self.files))
+        self.progress.setValue(self.progress.value() + 1)
+        #print(f"TODO: Progress: {args}, {kw}") # progress report is useless right now
 
     def summarize(self):
         summarize_thread = SummarizeThread(files=self.files, output=self.output, parent=self)
@@ -444,8 +450,6 @@ class GUI(QWidget):
 
     def initUI(self):
         self.setAcceptDrops(True)
-
-        #self.setGeometry(300, 300, 280, 150)
 
         layout = self.layout = QGridLayout()
         layout.setSpacing(10)
