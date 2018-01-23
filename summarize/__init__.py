@@ -391,22 +391,44 @@ class GUI(QWidget):
     def summarize(self):
         config = Config(self.output)
         output_file = summarize_files(list(self.files), self.output, config=config)
-        open(output_file)
+        start(output_file)
         raise SystemExit
 
 
     def initUI(self):
         self.setAcceptDrops(True)
 
-        self.summarize_button = button(parent=self, title='Summarize', callback=self.summarize)
-        self.summarize_button.move(100, 65)
-        self.summarize_button.hide()
+        self.setGeometry(300, 300, 280, 150)
 
         self.drag_label = QLabel('drag files here', self)
-        self.drag_label.move(50, 65)
+        ps = self.size()
+        ls = self.drag_label.size()
+        pw, ph = ps.width(), ps.height()
+        lx, ly = (pw - ls.width()) / 2, (ph - ls.height()) / 2
+        self.drag_label.move(lx, ly)
+
+        self.summarize_button = button(parent=self, title='', callback=self.summarize)
+        self.summarize_button.hide()
+        self.update_button_label('Summarize')
 
         self.setWindowTitle('Post Process xlsx summarizer')
-        self.setGeometry(300, 300, 280, 150)
+
+    def update_button_label(self, txt, resize_parent_to_fit=False):
+        ps = self.size()
+        pw, ph = ps.width(), ps.height()
+        text = self.summarize_button.text()
+        #  .size() is incorrect (not updated - we need to force?) so estimate
+        # assuming a fixed font width
+        self.summarize_button.setText(txt)
+        bs = self.summarize_button.size()
+        new_button_width = len(txt) / float(len(text)) * bs.width() if len(text) > 0 else bs.width()
+        pw = max(pw, new_button_width + 10)
+        bx, by = (pw - new_button_width) / 2, (ph - bs.height()) / 2
+        self.summarize_button.move(bx, by)
+        if not resize_parent_to_fit:
+            return
+        # resize parent to fit
+        self.resize(pw, ph)
 
     def dragEnterEvent(self, e):
         e.accept()
@@ -421,9 +443,8 @@ class GUI(QWidget):
             return
         directory = os.path.dirname(files[0])
         self.output = directory
-        if os.path.exists(self.output):
-            self.status_label.setText('too many existing summarize.xlsx files, delete them')
-            print("failed to find an output filename that doesn't already exist")
+        if not os.path.exists(self.output):
+            print(f"no such directory {self.output}")
             return
         for file in files:
             if not os.path.exists(file):
@@ -431,7 +452,7 @@ class GUI(QWidget):
             else:
                 self.files.add(file)
         if len(self.files) > 0:
-            self.summarize_button.setText(f"{len(self.files)} to {self.output}")
+            self.update_button_label(f"{len(self.files)} to {self.output}", True)
             self.drag_label.hide()
             self.summarize_button.show()
         else:
