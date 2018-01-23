@@ -1,0 +1,63 @@
+# version format
+version: "{build}"
+
+skip_tags: false
+
+clone_depth: 20
+
+os: Visual Studio 2015
+
+environment:
+
+  matrix:
+    - PYTHON: "C:\\Python36-x64"
+      PYTHON_VERSION: "3.6.1"
+      PYTHON_ARCH: "64"
+      ARCH: x86_64
+      VS_VER: "2015"
+
+init:
+  - ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH%
+
+install:
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+
+  # Upgrade to the latest version of pip to avoid it displaying warnings
+  # about it being out of date.
+  - "pip install --disable-pip-version-check --user --upgrade pip"
+
+  # Should this be done here or via setup some how? it should not be part of the build/install requirements, just development
+  - "pip install pytest"
+
+  # Install the build dependencies of the project. If some dependencies contain
+  # compiled extensions and are not provided as pre-built wheel packages,
+  # pip will build them from source using the MSVC compiler matching the
+  # target Python version and architecture
+  - cd "%APPVEYOR_BUILD_FOLDER%\\emolog_pc"
+  - python -c "import os; print(os.getcwd())"
+  - "pip install -e ."
+
+test_script:
+  - cd "%APPVEYOR_BUILD_FOLDER%"
+#  - pytest --fulltrace --doctest-modules --junitxml=%APPVEYOR_BUILD_FOLDER\junit.xml summarize
+  # sanity of pyinstaller artifacts
+  - mkdir "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
+  - cd "%APPVEYOR_BUILD_FOLDER%\\pyinstaller_test"
+  - 7z x "%APPVEYOR_BUILD_FOLDER%\dist\summarize.zip"
+  - cd summarize
+  - summarize.exe --help
+
+build_script:
+  - cd "%APPVEYOR_BUILD_FOLDER%"
+  - "python setup.py install"
+  - "pyinstaller summarize.spec"
+  - cd "%APPVEYOR_BUILD_FOLDER%\\dist"
+  # TODO: proper versions for both the zipped directory and the zip file
+  # TODO -1: version reporting correctly for both summarize and emotool
+  - 7z a summarize.zip summarize
+  - dir %APPVEYOR_BUILD_FOLDER%
+  - dir %APPVEYOR_BUILD_FOLDER%\dist
+
+artifacts:
+  - path: dist\summarize.zip
+    name: Summarize
