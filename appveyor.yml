@@ -18,11 +18,12 @@ environment:
 
 init:
   - ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH%
-  - git submodule init
-  - git submodule update --recursive
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+
+  - git submodule init
+  - git submodule update --recursive
 
   # Upgrade to the latest version of pip to avoid it displaying warnings
   # about it being out of date.
