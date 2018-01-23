@@ -35,7 +35,7 @@ install:
   # target Python version and architecture
   - cd "%APPVEYOR_BUILD_FOLDER%"
   - python -c "import os; print(os.getcwd())"
-  - "pip install -e ."
+  - "pip install -r requirements.txt"
 
 test_script:
   - cd "%APPVEYOR_BUILD_FOLDER%"
