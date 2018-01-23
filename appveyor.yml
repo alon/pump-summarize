@@ -49,7 +49,7 @@ test_script:
 
 build_script:
   - cd "%APPVEYOR_BUILD_FOLDER%"
-  - "python setup.py install"
+  - "pip install -r requirements.txt"
   - "pyinstaller summarize.spec"
   - cd "%APPVEYOR_BUILD_FOLDER%\\dist"
   # TODO: proper versions for both the zipped directory and the zip file

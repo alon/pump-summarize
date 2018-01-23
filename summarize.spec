@@ -1,9 +1,12 @@
 # -*- mode: python -*-
 
+from os import environ, path
+HOME = environ['HOME']
+
 block_cipher = None
 
-a = Analysis(['summarize.py'],
-             pathex=['/images/cometme-wp/workspace/emolog_pc'],
+a = Analysis([path.join('summarize', '__init__.py')],
+             #pathex=['.'],
              binaries=[],
              datas=[],
              hiddenimports=[],
