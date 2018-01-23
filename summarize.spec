@@ -1,7 +1,6 @@
 # -*- mode: python -*-
 
-from os import environ, path
-HOME = environ['HOME']
+from os import path
 
 block_cipher = None
 
