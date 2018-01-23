@@ -7,7 +7,7 @@ from linecache import getlines
 from configparser import ConfigParser
 
 from PyQt5 import QtGui, QtCore
-from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel
+from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel, QGridLayout, QProgressBar
 
 import xlsxwriter as xlwr
 import xlrd
@@ -398,37 +398,29 @@ class GUI(QWidget):
     def initUI(self):
         self.setAcceptDrops(True)
 
-        self.setGeometry(300, 300, 280, 150)
+        #self.setGeometry(300, 300, 280, 150)
 
-        self.drag_label = QLabel('drag files here', self)
-        ps = self.size()
-        ls = self.drag_label.size()
-        pw, ph = ps.width(), ps.height()
-        lx, ly = (pw - ls.width()) / 2, (ph - ls.height()) / 2
-        self.drag_label.move(lx, ly)
+        layout = self.layout = QGridLayout()
+        layout.setSpacing(10)
+        self.setLayout(layout)
 
-        self.summarize_button = button(parent=self, title='', callback=self.summarize)
+        # TODO ugly hack to make grid give more space to label - better to use
+        # spacing, once I learn how.
+        l = ' ' * 10 + 'Drag files Here' + ' ' * 10
+        self.drag_label = QLabel('/' + (' ' * (len(l) - 1 + 10)) + '\n' + l + '\n' + ' ' * (len(l) - 1 + 10) + '/')
+        layout.addWidget(self.drag_label, 1, 0)
+
+        self.summarize_button = button(title='Summarize', callback=self.summarize, parent=self)
         self.summarize_button.hide()
-        self.update_button_label('Summarize')
-
+        layout.addWidget(self.summarize_button, 2, 0)
         self.setWindowTitle('Post Process xlsx summarizer')
 
-    def update_button_label(self, txt, resize_parent_to_fit=False):
-        ps = self.size()
-        pw, ph = ps.width(), ps.height()
-        text = self.summarize_button.text()
-        #  .size() is incorrect (not updated - we need to force?) so estimate
-        # assuming a fixed font width
-        self.summarize_button.setText(txt)
-        bs = self.summarize_button.size()
-        new_button_width = len(txt) / float(len(text)) * bs.width() if len(text) > 0 else bs.width()
-        pw = max(pw, new_button_width + 10)
-        bx, by = (pw - new_button_width) / 2, (ph - bs.height()) / 2
-        self.summarize_button.move(bx, by)
-        if not resize_parent_to_fit:
-            return
-        # resize parent to fit
-        self.resize(pw, ph)
+        self.progress = QProgressBar()
+        self.progress.hide()
+        layout.addWidget(self.progress, 3, 0)
+
+    def update_button_label(self, new_text):
+        self.summarize_button.setText(new_text)
 
     def dragEnterEvent(self, e):
         e.accept()
@@ -452,7 +444,7 @@ class GUI(QWidget):
             else:
                 self.files.add(file)
         if len(self.files) > 0:
-            self.update_button_label(f"{len(self.files)} to {self.output}", True)
+            self.update_button_label(f"{len(self.files)} to {self.output}")
             self.drag_label.hide()
             self.summarize_button.show()
         else:
