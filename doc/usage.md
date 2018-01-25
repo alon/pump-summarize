@@ -13,7 +13,7 @@ Current limitations:
 
 Step one: Install
 -----------------
-- Download the latest release from: [summarize.zip @ appveyor](https://ci.appveyor.com/api/buildjobs/ne2ad64pp1atai1x/artifacts/dist%2Fsummarize.zip)
+- Download the latest release from: [dist/summarize.zip @ appveyor](https://ci.appveyor.com/project/alon/pump-summarize/build/artifacts)
 - Unzip summarize.zip
 - Locate summarize.exe inside the summarize directory
 - For convenience: Create a shortcut by draging the exe to the desktop
