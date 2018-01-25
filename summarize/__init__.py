@@ -5,6 +5,7 @@ import sys
 from argparse import ArgumentParser
 from linecache import getlines
 from configparser import ConfigParser
+from urllib.parse import urlparse, unquote
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QThread, pyqtSignal # punt on QProcess due to IPC complexity
@@ -357,18 +358,20 @@ def button(parent, title, callback):
 
 def paths_from_file_urls(urls):
     ret = []
-    file_colon_doubleslash = 'file://'
-    for x in urls:
-        if not x.startswith(file_colon_doubleslash):
+    for url in urls:
+        if len(url) == 0:
             continue
-        x = x[len(file_colon_doubleslash):]
-        if 'win' in sys.platform:
-            # starts with an extra '/', remove it
-            x = x[1:]
-        if not os.path.exists(x):
-            print(f"no such file: {x}")
+        parsed = urlparse(url)
+        if parsed.scheme != 'file':
+            print(f'ignoring scheme = {parsed.scheme!r} ({url!r})')
             continue
-        ret.append(x)
+        path = unquote(parsed.path if len(parsed.path) > 0 else parsed.netloc)
+        if 'win' in sys.platform and path[:1] == '/':
+            path = path[1:]
+        if not os.path.exists(path):
+            print(f"no such file: {path!r} ({url!r})")
+            continue
+        ret.append(path)
     return ret
 
 
@@ -376,7 +379,7 @@ def start(filename):
     if hasattr(os, 'startfile'):
         os.startfile(filename)
     else:
-        os.system(f'xdg-open {filename}')
+        os.system(f'xdg-open "{filename}"')
 
 
 class Config:
