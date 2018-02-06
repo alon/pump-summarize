@@ -9,7 +9,7 @@ from urllib.parse import urlparse, unquote
 
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtCore import QThread, pyqtSignal # punt on QProcess due to IPC complexity
-from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel, QGridLayout, QProgressBar
+from PyQt5.QtWidgets import QPushButton, QWidget, QApplication, QLabel, QGridLayout, QProgressBar, QMessageBox
 
 import xlsxwriter as xlwr
 import xlrd
@@ -425,12 +425,42 @@ class SummarizeThread(QThread):
         self.progress(-1) # TODO - type safe, nicer
 
 
+parameters_help = """\
+ Create a file named "summary.ini" in the file directory.
+ Example contents:
+
+[global]
+parameters=Comm advance mode,Comm advance const delay up,Comm advance const delay down
+
+[half_cycle]
+;; Defaults to: Average Velocity [m/s],Flow Rate [LPM]
+fields=Average Velocity [m/s],Flow Rate [LPM]
+;; Defaults to: down,up,all
+directions=down,up,all
+"""
+
+
+gui_help = f"""\
+Drag files from a _Single Directory_ and click the resulting button. Opens
+the result file (created in the same directory) when it is completely finished
+(watch the pretty progress monitor).
+
+Adding more parameters:
+This is a manual process - no GUI:
+{parameters_help}
+"""
+
+
 class GUI(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
         self.files = set()
         self.output = None
+
+    def show_help(self):
+        QMessageBox.information(self, "Help", gui_help)
+
 
     def updateProgBar(self, *args, **kw):
         if args[0] == -1:
@@ -463,6 +493,7 @@ class GUI(QWidget):
         l = ' ' * 10 + 'Drag files Here' + ' ' * 10
         self.drag_label = QLabel('/' + (' ' * (len(l) - 1 + 10)) + '\n' + l + '\n' + ' ' * (len(l) - 1 + 10) + '/')
         layout.addWidget(self.drag_label, 1, 0)
+        layout.addWidget(button(title="Help", callback=self.show_help, parent=self), 2, 0)
 
         self.summarize_button = button(title='Summarize', callback=self.summarize, parent=self)
         self.summarize_button.hide()
