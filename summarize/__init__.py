@@ -413,10 +413,30 @@ class Config:
             self.config.read(ini_filename)
         else:
             self.config = None
+        # merge half_cycle and half_cycles sections, converting them to
+        # half_cycle section
+        half_cycles = self._get_sections(['half_cycle', 'half_cycles'])
         self.user_defined_fields = self._get_strings('user_defined', 'fields', ["Pump Head [m]", "Damper used?", "PSU or Solar Panels", "MPPT used?", "General Notes"])
-        self.half_cycle_fields = self._get_strings('half_cycle', 'fields', default=['Average Velocity [m/s]', 'Flow Rate [LPM]'])
-        self.half_cycle_directions = self._get_strings('half_cycle', 'directions', ['down', 'up', 'all'])
+        self.half_cycle_fields = half_cycles.get('fields', ['Average Velocity [m/s]', 'Flow Rate [LPM]'])
+        self.half_cycle_directions = half_cycles.get('directions', ['down', 'up', 'all'])
         self.parameters = self._get_strings('global', 'parameters', [])
+
+    def _get_sections(self, sections):
+        ds = [self._get_section(s) for s in sections]
+        dret = {}
+        for d in ds:
+            dret.update(d)
+        return self._parse_strings(dret)
+
+    def _parse_strings(self, d):
+        def split(v):
+            return [x.strip() for x in v.split(',')]
+        return {k: split(v) for k, v in d.items()}
+
+    def _get_section(self, section):
+        if not self.config or not self.config.has_section(section):
+            return {}
+        return dict(self.config._unify_values(section, None))
 
     def _get(self, section, field, default):
         if self.config is not None and self.config.has_option(section, field):
