@@ -44,7 +44,7 @@ def read_xlsx(d):
 
 
 def get_readers(orig_filenames, progress=None):
-    readers = []
+    filename_to_reader = {}
     filenames = []
     for i, filename in enumerate(orig_filenames):
         reader = xlrd.open_workbook(filename=filename)
@@ -53,9 +53,10 @@ def get_readers(orig_filenames, progress=None):
             progress(i)
         if HALF_CYCLES_SHEET_NAME not in sheet_names:
             continue
-        readers.append(reader)
+        filename_to_reader[filename] = reader
         filenames.append(filename)
-    return readers, filenames
+    filenames.sort()
+    return [filename_to_reader[filename] for filename in filenames], filenames
 
 
 def verify_cell_at(sheet, row, col, contents):
