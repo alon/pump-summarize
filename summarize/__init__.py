@@ -335,7 +335,7 @@ def summarize_files(filenames, output_path, config, progress=None):
             {k: HALF_CYCLE_CELL_TO_FORMULA.get(HALF_CYCLE_TITLE_TO_CELL_NAME.get(k, None), v) for k, v in zip(summary['titles'], summary[key.lower()])
              if k in summary_titles}
             for key in half_cycle_directions]
-        cell_locations = {k: xl_rowcol_to_cell(row=row.val, col=1 + i) for i, k in enumerate(HALF_CYCLE_PREDEFINED_CELL_NAMES)}
+        cell_locations = {k: xl_rowcol_to_cell(row=row.val, col=1 + N_user + i) for i, k in enumerate(HALF_CYCLE_PREDEFINED_CELL_NAMES)}
         summary_rows_with_unfilled_formula = [
             (Render.subset(summary_titles, sum_row), dunion(cell_locations, cells_from_d(keys=summary_titles, row=row.val, col=col)))
                         for col, sum_row in enum_cum_len(sum_per_dir, initial=param_left_col)]
