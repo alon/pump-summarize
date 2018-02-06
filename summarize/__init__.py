@@ -259,7 +259,7 @@ def summarize_files(filenames, output_path, config, progress=None):
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
     create a new summary.xls file from them
     :param dir:
-    :return: written xlsx filename full path
+    :return: written xlsx filename full path if successful, else None
     """
 
     if progress is None:
@@ -274,27 +274,23 @@ def summarize_files(filenames, output_path, config, progress=None):
     user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
     half_cycle_directions = config.half_cycle_directions
     half_cycle_fields = config.half_cycle_fields
-    summary_titles = half_cycle_fields
+    parameter_names = HALF_CYCLE_PREDEFINED_TITLES + [x for x in config.parameters]
+
+    # check we have all inputs required for the formula presented
+    required_cell_names = required_cell_names_from_titles(half_cycle_fields)
+    available_cell_names = {HALF_CYCLE_TITLE_TO_CELL_NAME[x] for x in set(HALF_CYCLE_TITLE_TO_CELL_NAME.keys()) & (set(parameter_names) | set(half_cycle_fields))}
+    if required_cell_names - available_cell_names:
+        missing_titles = [HALF_CYCLE_CELL_TO_TITLE_NAME[x] for x in sorted(list(required_cell_names - available_cell_names))]
+        half_cycle_fields = half_cycle_fields + missing_titles
+        print(f"added missing {missing_titles!r}")
 
     # compute titles - we have a left col for the 'Up/Down/All' caption
-    parameter_names = HALF_CYCLE_PREDEFINED_TITLES + [x for x in config.parameters]
+    summary_titles = half_cycle_fields
     N_par = len(parameter_names)
     N_sum = len(summary_titles)
     N_user = len(user_defined_fields)
     top_titles = [None] * N_par + sum([[d] * N_sum for d in half_cycle_directions], [])
     titles = parameter_names + (len(half_cycle_directions) * summary_titles)
-
-    # check we have all inputs required for the formula presented
-    required_cell_names = required_cell_names_from_titles(summary_titles)
-
-    available_cell_names = {HALF_CYCLE_TITLE_TO_CELL_NAME[x] for x in set(HALF_CYCLE_TITLE_TO_CELL_NAME.keys()) & set(titles)}
-
-    if required_cell_names - available_cell_names:
-        missing_names = list(sorted(required_cell_names - available_cell_names))
-        print(f"missing cells: {missing_names}")
-        missing_titles = [HALF_CYCLE_CELL_TO_TITLE_NAME.get(n, f'? {n}') for n in missing_names]
-        print(f"equivalent titles:{missing_titles}")
-        return
 
     readers, filenames = get_readers(filenames, lambda *args: update_progress()) # the initial filenames contains xlsx that are not produced by the post processor
 
