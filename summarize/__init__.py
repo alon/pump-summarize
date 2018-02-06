@@ -494,11 +494,13 @@ This is a manual process - no GUI:
 
 
 class GUI(QWidget):
+
     def __init__(self):
         super().__init__()
         self.initUI()
         self.files = set()
         self.output = None
+
 
     def show_help(self):
         QMessageBox.information(self, "Help", gui_help)
@@ -515,6 +517,7 @@ class GUI(QWidget):
     def summarize(self):
         summarize_thread = SummarizeThread(files=self.files, output=self.output, parent=self)
         # Connect signal to the desired function
+        self.updateProgBar([0])
         summarize_thread.sig.connect(self.updateProgBar)
         summarize_thread.start()
         self.summarize_thread = summarize_thread
