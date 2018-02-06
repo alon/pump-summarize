@@ -24,6 +24,8 @@ HALF_CYCLE_CELL_TO_TITLE_NAME,
 HALF_CYCLE_FORMULA_TITLES,
 )
 
+BUILD_NAME_FILENAME = 'build.txt'
+
 PARAMETERS_SHEET_NAME = 'Parameters'
 HALF_CYCLES_SHEET_NAME = 'Half-Cycles'
 
@@ -539,6 +541,9 @@ class GUI(QWidget):
         self.drag_label = QLabel('/' + (' ' * (len(l) - 1 + 10)) + '\n' + l + '\n' + ' ' * (len(l) - 1 + 10) + '/')
         layout.addWidget(self.drag_label, 1, 0)
         layout.addWidget(button(title="Help", callback=self.show_help, parent=self), 2, 0)
+        if os.path.exists(BUILD_NAME_FILENAME):
+            with open(BUILD_NAME_FILENAME) as f:
+                layout.addWidget(QLabel(f.read().strip()), 3, 0)
 
         self.summarize_button = button(title='Summarize', callback=self.summarize, parent=self)
         self.summarize_button.hide()
