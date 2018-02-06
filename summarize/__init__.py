@@ -226,6 +226,34 @@ def do_nothing(*args):
     pass
 
 
+def required_cell_names_from_titles(titles):
+    """ return the sum of cells required for given titles """
+
+    def helper(cells):
+        formulae = [HALF_CYCLE_CELL_TO_FORMULA[c] for c in cells if c in HALF_CYCLE_CELL_TO_FORMULA]
+
+        def cell_names_for_formulae(ff):
+            return [x for x in ff.__code__.co_varnames if x.endswith('_cell')]
+        return set(sum([cell_names_for_formulae(f) for f in formulae], []))
+
+    initial_cells = [HALF_CYCLE_TITLE_TO_CELL_NAME[k] for k in titles if k in HALF_CYCLE_FORMULA_TITLES]
+    s = helper(initial_cells)
+    N = 10
+    additions = [s]
+    for i in range(N):
+        print(s)
+        new_s = helper(s)
+        if len(new_s) == 0:
+            break
+        additions.append(new_s)
+        s = new_s
+    assert len(new_s) == 0, f'Increase formulae resolution iterations from {N}; unresolved variables: {new_s!r}'
+    s = additions[0]
+    for s2 in additions[1:]:
+        s |= s2
+    return s
+
+
 def summarize_files(filenames, output_path, config, progress=None):
     """
     read all .xls files in the directory that have a 'Half-Cycles' sheet, and
@@ -243,6 +271,31 @@ def summarize_files(filenames, output_path, config, progress=None):
         progress(progress_count[0])
         progress_count[0] += 1
 
+    user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
+    half_cycle_directions = config.half_cycle_directions
+    half_cycle_fields = config.half_cycle_fields
+    summary_titles = half_cycle_fields
+
+    # compute titles - we have a left col for the 'Up/Down/All' caption
+    parameter_names = HALF_CYCLE_PREDEFINED_TITLES + [x for x in config.parameters]
+    N_par = len(parameter_names)
+    N_sum = len(summary_titles)
+    N_user = len(user_defined_fields)
+    top_titles = [None] * N_par + sum([[d] * N_sum for d in half_cycle_directions], [])
+    titles = parameter_names + (len(half_cycle_directions) * summary_titles)
+
+    # check we have all inputs required for the formula presented
+    required_cell_names = required_cell_names_from_titles(summary_titles)
+
+    available_cell_names = {HALF_CYCLE_TITLE_TO_CELL_NAME[x] for x in set(HALF_CYCLE_TITLE_TO_CELL_NAME.keys()) & set(titles)}
+
+    if required_cell_names - available_cell_names:
+        missing_names = list(sorted(required_cell_names - available_cell_names))
+        print(f"missing cells: {missing_names}")
+        missing_titles = [HALF_CYCLE_CELL_TO_TITLE_NAME.get(n, f'? {n}') for n in missing_names]
+        print(f"equivalent titles:{missing_titles}")
+        return
+
     readers, filenames = get_readers(filenames, lambda *args: update_progress()) # the initial filenames contains xlsx that are not produced by the post processor
 
     N = len(readers)
@@ -252,24 +305,11 @@ def summarize_files(filenames, output_path, config, progress=None):
 
     output_filename = allocate_unused_file_in_directory(os.path.join(output_path, OUTPUT_FILENAME))
 
-    user_defined_fields = [x for x in config.user_defined_fields if x not in HALF_CYCLE_PREDEFINED_TITLES]
-    half_cycle_directions = config.half_cycle_directions
-    half_cycle_fields = config.half_cycle_fields
-
     print("reading parameters")
     all_parameters = [get_parameters(reader) for reader in readers]
 
     print("reading summaries")
     all_summaries = [get_summary_data(reader) for reader in readers]
-
-    # compute titles - we have a left col for the 'Up/Down/All' caption
-    summary_titles = half_cycle_fields
-    parameter_names = HALF_CYCLE_PREDEFINED_TITLES + [x for x in config.parameters]
-    N_par = len(parameter_names)
-    N_sum = len(summary_titles)
-    N_user = len(user_defined_fields)
-    top_titles = [None] * N_par + sum([[d] * N_sum for d in half_cycle_directions], [])
-    titles = parameter_names + (len(half_cycle_directions) * summary_titles)
 
     # aggregate all data to output: tuples of row, col, format, value
     output = Output(output_filename)
@@ -278,21 +318,6 @@ def summarize_files(filenames, output_path, config, progress=None):
     title_format = output.add_format(text_wrap=True, align='left', bold=True)
     col_format = output.add_format(text_wrap=True, align='left', num_format='0.000')
     user_format = output.add_format(align='left', num_format='0.000')
-
-    # check we have all inputs required for the formula presented
-    formulae = [HALF_CYCLE_CELL_TO_FORMULA[HALF_CYCLE_TITLE_TO_CELL_NAME[k]] for k in summary_titles
-                if k in HALF_CYCLE_FORMULA_TITLES]
-    cell_names = lambda ff: [x for x in ff.__code__.co_varnames if x.endswith('_cell')]
-    required_cell_names = set(sum([cell_names(f) for f in formulae], []))
-
-    available_cell_names = {HALF_CYCLE_TITLE_TO_CELL_NAME[x] for x in set(HALF_CYCLE_TITLE_TO_CELL_NAME.keys()) & set(titles)}
-
-    if required_cell_names - available_cell_names:
-        missing_names = list(sorted(required_cell_names - available_cell_names))
-        print(f"missing cells: {missing_names}")
-        missing_titles = [HALF_CYCLE_CELL_TO_TITLE_NAME[n] for n in missing_names]
-        print(f"equivalent titles:{missing_titles}")
-        return
 
     row = IntAlloc()
     # create titles
